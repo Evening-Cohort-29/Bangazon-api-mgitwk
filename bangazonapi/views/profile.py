@@ -12,8 +12,6 @@ from bangazonapi.models import OrderProduct, Favorite
 from bangazonapi.models import Recommendation
 from .product import ProductSerializer
 from .order import OrderSerializer
-
-
 class Profile(ViewSet):
     """Request handlers for user profile info in the Bangazon Platform"""
     permission_classes = (IsAuthenticatedOrReadOnly,)
@@ -185,6 +183,7 @@ class Profile(ViewSet):
                 cart = {}
                 cart["order"] = OrderSerializer(open_order, many=False, context={
                                                 'request': request}).data
+
                 cart["order"]["lineitems"] = line_items.data
                 cart["order"]["size"] = len(line_items.data)
 
