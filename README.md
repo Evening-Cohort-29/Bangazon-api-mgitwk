@@ -1,5 +1,9 @@
 # Bangazon Platform API
 
+<!-- Server will run at http://localhost:8000
+Import the api-requests-collection.json into Postman
+Test login with username: steve, password: Admin8* -->
+
 ## System Dependencies
 
 1. Follow installation guide for installing [pipx](https://pipx.pypa.io/stable/installation/).
