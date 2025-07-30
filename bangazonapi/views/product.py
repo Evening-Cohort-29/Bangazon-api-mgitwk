@@ -8,7 +8,7 @@ from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import serializers
 from rest_framework import status
-from bangazonapi.models import Product, Customer, ProductCategory
+from bangazonapi.models import Product, Customer, ProductCategory, ProductLike
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.parsers import MultiPartParser, FormParser
 
@@ -154,7 +154,9 @@ class Products(ViewSet):
         """
         try:
             product = Product.objects.get(pk=pk)
-            # TODO: add is_liked here
+            customer = Customer.objects.get(user=request.auth.user)
+            product.is_liked = ProductLike.objects.filter(
+                product=product, customer=customer).exists()
 
             serializer = ProductSerializer(
                 product, context={'request': request})
@@ -257,6 +259,8 @@ class Products(ViewSet):
         direction = self.request.query_params.get('direction', None)
         number_sold = self.request.query_params.get('number_sold', None)
 
+        min_price = self.request.query_params.get('min_price', None)
+
         if order is not None:
             order_filter = order
 
@@ -280,7 +284,19 @@ class Products(ViewSet):
 
             products = filter(sold_filter, products)
 
-        # TODO: add is_liked . loop over them to annotate is_liked for each one
+        if min_price is not None:
+            try:
+                min_price = float(min_price)
+                products = products.filter(price__gte=min_price)
+            except ValueError:
+                return Response({"message": "min_price must be a number"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # TODO: add is_liked. loop over them to annotate is_liked for each one
+        customer = Customer.objects.get(user=request.auth.user)
+
+        for product in products:
+            product.is_liked = ProductLike.objects.filter(
+                product=product, customer=customer).exists()
 
         serializer = ProductSerializer(
             products, many=True, context={'request': request})
@@ -303,6 +319,28 @@ class Products(ViewSet):
 
         return Response(None, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    # TODO: custom action: like
+    # /products/:pk/like
+    # detail=True means the URL will include the pk
+    @action(methods=["post"], detail=True)
+    def like(self, request, pk=None):
+        """Like a product"""
+        customer = Customer.objects.get(user=request.auth.user)
+        product = Product.objects.get(pk=pk)
 
-    # TODO: custom action: unlike
+        # get_or_create retrieves an obj and creates a new one if it doesn't exist
+        ProductLike.objects.get_or_create(customer=customer, product=product)
+        return Response({'message': 'Product liked'}, status=status.HTTP_201_CREATED)
+
+    # /products/:pk/unlike
+    @action(methods=["delete"], detail=True)
+    def unlike(self, request, pk=None):
+        """Unlike a product"""
+        customer = Customer.objects.get(user=request.auth.user)
+        product = Product.objects.get(pk=pk)
+
+        try:
+            like = ProductLike.objects.get(customer=customer, product=product)
+            like.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ProductLike.DoesNotExist:
+            return Response({"message": "Product not liked yet"}, status=status.HTTP_404_NOT_FOUND)
