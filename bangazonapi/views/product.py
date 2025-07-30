@@ -19,7 +19,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ('id', 'name', 'price', 'number_sold', 'description',
                   'quantity', 'created_date', 'location', 'image_path',
-                  'average_rating', 'can_be_rated', )
+                  'average_rating', 'can_be_rated', 'is_liked')
         depth = 1
 
 
@@ -94,13 +94,15 @@ class Products(ViewSet):
         customer = Customer.objects.get(user=request.auth.user)
         new_product.customer = customer
 
-        product_category = ProductCategory.objects.get(pk=request.data["category_id"])
+        product_category = ProductCategory.objects.get(
+            pk=request.data["category_id"])
         new_product.category = product_category
 
         if "image_path" in request.data:
             format, imgstr = request.data["image_path"].split(';base64,')
             ext = format.split('/')[-1]
-            data = ContentFile(base64.b64decode(imgstr), name=f'{new_product.id}-{request.data["name"]}.{ext}')
+            data = ContentFile(base64.b64decode(
+                imgstr), name=f'{new_product.id}-{request.data["name"]}.{ext}')
 
             new_product.image_path = data
 
@@ -152,7 +154,10 @@ class Products(ViewSet):
         """
         try:
             product = Product.objects.get(pk=pk)
-            serializer = ProductSerializer(product, context={'request': request})
+            # TODO: add is_liked here
+
+            serializer = ProductSerializer(
+                product, context={'request': request})
             return Response(serializer.data)
         except Exception as ex:
             return HttpResponseServerError(ex)
@@ -182,7 +187,8 @@ class Products(ViewSet):
         customer = Customer.objects.get(user=request.auth.user)
         product.customer = customer
 
-        product_category = ProductCategory.objects.get(pk=request.data["category_id"])
+        product_category = ProductCategory.objects.get(
+            pk=request.data["category_id"])
         product.category = product_category
         product.save()
 
@@ -274,6 +280,8 @@ class Products(ViewSet):
 
             products = filter(sold_filter, products)
 
+        # TODO: add is_liked . loop over them to annotate is_liked for each one
+
         serializer = ProductSerializer(
             products, many=True, context={'request': request})
         return Response(serializer.data)
@@ -285,7 +293,8 @@ class Products(ViewSet):
         if request.method == "POST":
             rec = Recommendation()
             rec.recommender = Customer.objects.get(user=request.auth.user)
-            rec.customer = Customer.objects.get(user__id=request.data["recipient"])
+            rec.customer = Customer.objects.get(
+                user__id=request.data["recipient"])
             rec.product = Product.objects.get(pk=pk)
 
             rec.save()
@@ -293,3 +302,7 @@ class Products(ViewSet):
             return Response(None, status=status.HTTP_204_NO_CONTENT)
 
         return Response(None, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    # TODO: custom action: like
+
+    # TODO: custom action: unlike
