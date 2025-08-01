@@ -19,7 +19,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ('id', 'name', 'price', 'number_sold', 'description',
                   'quantity', 'created_date', 'location', 'image_path',
-                  'average_rating', 'can_be_rated', )
+                  'average_rating', 'can_be_rated', 'category' )
         depth = 1
 
 
@@ -252,6 +252,8 @@ class Products(ViewSet):
         number_sold = self.request.query_params.get('number_sold', None)
         min_price = self.request.query_params.get('min_price', None)
 
+        print(direction)
+
         if order is not None:
             order_filter = order
 
@@ -265,7 +267,7 @@ class Products(ViewSet):
             products = products.filter(category__id=category)
 
         if quantity is not None:
-            products = products.order_by("-created_date")[:int(quantity)]
+            products = products[:int(quantity)]
 
         if number_sold is not None:
             def sold_filter(product):
