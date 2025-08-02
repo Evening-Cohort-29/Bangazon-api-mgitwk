@@ -17,7 +17,8 @@ class ProductSerializer(serializers.ModelSerializer):
     """JSON serializer for products"""
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'number_sold', 'description', 'quantity', 'created_date', 'location', 'image_path', 'average_rating', 'can_be_rated', 'category', 'is_liked')
+        fields = ('id', 'name', 'price', 'number_sold', 'description', 'quantity', 'created_date',
+                  'location', 'image_path', 'average_rating', 'can_be_rated', 'category', 'is_liked')
         depth = 1
 
 
