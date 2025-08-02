@@ -8,7 +8,7 @@ from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import serializers
 from rest_framework import status
-from bangazonapi.models import Product, Customer, ProductCategory
+from bangazonapi.models import Product, Customer, ProductCategory, ProductLike
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.parsers import MultiPartParser, FormParser
 
@@ -17,9 +17,7 @@ class ProductSerializer(serializers.ModelSerializer):
     """JSON serializer for products"""
     class Meta:
         model = Product
-        fields = ('id', 'name', 'price', 'number_sold', 'description',
-                  'quantity', 'created_date', 'location', 'image_path',
-                  'average_rating', 'can_be_rated', 'category' )
+        fields = ('id', 'name', 'price', 'number_sold', 'description', 'quantity', 'created_date', 'location', 'image_path', 'average_rating', 'can_be_rated', 'category', 'is_liked')
         depth = 1
 
 
@@ -94,13 +92,15 @@ class Products(ViewSet):
         customer = Customer.objects.get(user=request.auth.user)
         new_product.customer = customer
 
-        product_category = ProductCategory.objects.get(pk=request.data["category_id"])
+        product_category = ProductCategory.objects.get(
+            pk=request.data["category_id"])
         new_product.category = product_category
 
         if "image_path" in request.data:
             format, imgstr = request.data["image_path"].split(';base64,')
             ext = format.split('/')[-1]
-            data = ContentFile(base64.b64decode(imgstr), name=f'{new_product.id}-{request.data["name"]}.{ext}')
+            data = ContentFile(base64.b64decode(
+                imgstr), name=f'{new_product.id}-{request.data["name"]}.{ext}')
 
             new_product.image_path = data
 
@@ -152,7 +152,12 @@ class Products(ViewSet):
         """
         try:
             product = Product.objects.get(pk=pk)
-            serializer = ProductSerializer(product, context={'request': request})
+            customer = Customer.objects.get(user=request.auth.user)
+            product.is_liked = ProductLike.objects.filter(
+                product=product, customer=customer).exists()
+
+            serializer = ProductSerializer(
+                product, context={'request': request})
             return Response(serializer.data)
         except Exception as ex:
             return HttpResponseServerError(ex)
@@ -182,7 +187,8 @@ class Products(ViewSet):
         customer = Customer.objects.get(user=request.auth.user)
         product.customer = customer
 
-        product_category = ProductCategory.objects.get(pk=request.data["category_id"])
+        product_category = ProductCategory.objects.get(
+            pk=request.data["category_id"])
         product.category = product_category
         product.save()
 
@@ -250,6 +256,7 @@ class Products(ViewSet):
         order = self.request.query_params.get('order_by', None)
         direction = self.request.query_params.get('direction', None)
         number_sold = self.request.query_params.get('number_sold', None)
+
         min_price = self.request.query_params.get('min_price', None)
         location = self.request.query_params.get('location', None)
 
@@ -283,7 +290,14 @@ class Products(ViewSet):
                 min_price = float(min_price)
                 products = products.filter(price__gte=min_price)
             except ValueError:
-                  return Response({"message": "min_price must be a number"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "min_price must be a number"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # TODO: add is_liked. loop over them to annotate is_liked for each one
+        customer = Customer.objects.get(user=request.auth.user)
+
+        for product in products:
+            product.is_liked = ProductLike.objects.filter(
+                product=product, customer=customer).exists()
 
         if location is not None:
             products = products.filter(location__contains=location)
@@ -299,7 +313,8 @@ class Products(ViewSet):
         if request.method == "POST":
             rec = Recommendation()
             rec.recommender = Customer.objects.get(user=request.auth.user)
-            rec.customer = Customer.objects.get(user__id=request.data["recipient"])
+            rec.customer = Customer.objects.get(
+                user__id=request.data["recipient"])
             rec.product = Product.objects.get(pk=pk)
 
             rec.save()
@@ -307,3 +322,29 @@ class Products(ViewSet):
             return Response(None, status=status.HTTP_204_NO_CONTENT)
 
         return Response(None, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    # /products/:pk/like
+    # detail=True means the URL will include the pk
+    @action(methods=["post"], detail=True)
+    def like(self, request, pk=None):
+        """Like a product"""
+        customer = Customer.objects.get(user=request.auth.user)
+        product = Product.objects.get(pk=pk)
+
+        # get_or_create retrieves an obj and creates a new one if it doesn't exist
+        ProductLike.objects.get_or_create(customer=customer, product=product)
+        return Response({'message': 'Product liked'}, status=status.HTTP_201_CREATED)
+
+    # /products/:pk/unlike
+    @action(methods=["delete"], detail=True)
+    def unlike(self, request, pk=None):
+        """Unlike a product"""
+        customer = Customer.objects.get(user=request.auth.user)
+        product = Product.objects.get(pk=pk)
+
+        try:
+            like = ProductLike.objects.get(customer=customer, product=product)
+            like.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ProductLike.DoesNotExist:
+            return Response({"message": "Product not liked yet"}, status=status.HTTP_404_NOT_FOUND)

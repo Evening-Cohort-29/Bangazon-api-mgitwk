@@ -68,6 +68,15 @@ class Product(SafeDeleteModel):
         avg = total_rating / count
         return avg
 
+    # is_liked property: calculated during request/response cycle with a client
+    @property
+    def is_liked(self):
+        return self.__is_liked
+
+    @is_liked.setter
+    def is_liked(self, value):
+        self.__is_liked = value
+
     class Meta:
         verbose_name = ("product")
         verbose_name_plural = ("products")
