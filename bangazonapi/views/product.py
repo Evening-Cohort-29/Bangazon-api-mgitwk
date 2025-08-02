@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework import serializers
 from rest_framework import status
 from bangazonapi.models import Product, Customer, ProductCategory, ProductLike
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 
 
@@ -349,3 +349,17 @@ class Products(ViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ProductLike.DoesNotExist:
             return Response({"message": "Product not liked yet"}, status=status.HTTP_404_NOT_FOUND)
+
+    #  GET /products/liked
+    @action(methods=["get"], detail=False, url_path='liked', permission_classes=[IsAuthenticated])
+    def liked(self, request):
+        """Get list of liked products by user"""
+        customer = Customer.objects.get(user=request.user)
+        # get the ProductLike objs for the customer
+        likes = ProductLike.objects.filter(customer=customer)
+        # get the product for each
+        products = [like.product for like in likes]
+
+        serializer = ProductSerializer(
+            products, many=True, context={'request': request})
+        return Response(serializer.data)
